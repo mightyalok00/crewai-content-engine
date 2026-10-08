@@ -7,11 +7,13 @@ import urllib.request
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from security import require_local_admin, safe_webhook_url, post_json
 
 # Configure UTF-8 encoding on Windows
 if sys.platform == "win32":
@@ -24,10 +26,10 @@ app = FastAPI(title="CrewAI Studio API", version="3.5.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(","),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -43,23 +45,23 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 class GenerateRequest(BaseModel):
-    topic: str
-    channel: str = "@krishnaik06"
+    topic: str = Field(..., min_length=1, max_length=500)
+    channel: str = Field("@krishnaik06", max_length=500)
 
 
 class YouTubeInspectRequest(BaseModel):
-    url: str
+    url: str = Field(..., min_length=1, max_length=2048)
 
 
 class SettingsRequest(BaseModel):
-    api_key: str
-    model_name: str
+    api_key: str = Field(..., min_length=10, max_length=500)
+    model_name: str = Field(..., min_length=1, max_length=200)
     memory_enabled: bool = True
-    embedder_provider: str = "onnx"
+    embedder_provider: str = Field("onnx", pattern="^(onnx|google|openai)$")
 
 
 class WebhookPublishRequest(BaseModel):
-    webhook_url: str
+    webhook_url: str = Field(..., min_length=8, max_length=2048)
     topic: str
     channel: str = ""
     markdown_content: str
@@ -75,8 +77,8 @@ class CoverGenerateRequest(BaseModel):
 
 
 class HtmlExportRequest(BaseModel):
-    topic: str
-    html_body: str
+    topic: str = Field(..., min_length=1, max_length=500)
+    html_body: str = Field(..., min_length=1, max_length=2_000_000)
 
 
 @app.post("/api/youtube/inspect")
@@ -133,7 +135,8 @@ async def get_latest_article():
 
 
 @app.get("/api/settings")
-async def get_settings():
+async def get_settings(request: Request):
+    require_local_admin(request)
     load_dotenv(override=True)
     memory_enabled = os.getenv("CREW_MEMORY_ENABLED", "true").lower() in (
         "true",
@@ -150,7 +153,7 @@ async def get_settings():
         or "gemini/gemini-3.7-flash"
     )
     return {
-        "api_key": api_key,
+        "api_key_configured": bool(api_key),
         "model_name": model_name,
         "provider": "google-ai-studio",
         "memory_enabled": memory_enabled,
@@ -159,7 +162,8 @@ async def get_settings():
 
 
 @app.post("/api/settings")
-async def save_settings(req: SettingsRequest):
+async def save_settings(req: SettingsRequest, request: Request):
+    require_local_admin(request)
     memory_str = "true" if req.memory_enabled else "false"
 
     env_content = (
@@ -302,9 +306,9 @@ async def get_latest_cover():
 
 
 @app.post("/api/publish-webhook")
-async def publish_webhook(req: WebhookPublishRequest):
-    url = req.webhook_url.strip()
-    if not url.startswith(("http://", "https://")):
+async def publish_webhook(req: WebhookPublishRequest, request: Request):
+    require_local_admin(request)
+    url = safe_webhook_url(req.webhook_url)
         raise HTTPException(
             status_code=400,
             detail="Invalid Webhook URL. Must begin with http:// or https://",
@@ -332,7 +336,7 @@ async def publish_webhook(req: WebhookPublishRequest):
             },
             method="POST",
         )
-        with urllib.request.urlopen(http_req, timeout=15) as response:
+        with post_json(url, payload, timeout=15) as response:
             status_code = response.getcode()
             body = response.read().decode("utf-8", errors="replace")
             return status_code, body[:500]
@@ -354,6 +358,8 @@ async def publish_webhook(req: WebhookPublishRequest):
 
 @app.post("/api/export-html")
 async def export_html(req: HtmlExportRequest):
+    # The exported body is intentionally treated as HTML. This endpoint is local-only in the
+    # production profile; callers should sanitize untrusted content before publishing it.
     styled_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
