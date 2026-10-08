@@ -178,6 +178,8 @@ If a worker disappears, heartbeat recovery can requeue the job.
 | `GET /api/jobs/{job_id}` | Inspect job status. |
 | `GET /api/jobs/{job_id}/events` | Replay/stream persisted job events through SSE. |
 | `GET /api/jobs/{job_id}/artifacts` | Retrieve generated artifacts. |
+| `GET /api/jobs/{job_id}/timeline` | Replay the persisted lifecycle timeline for debugging and observability. |
+| `GET /api/jobs/{job_id}/metrics` | Return duration, retries, event counts, and lifecycle metrics. |
 | `POST /api/generate` | Compatibility endpoint returning the job contract. |
 | `POST /api/youtube/inspect` | Inspect a YouTube URL. |
 | `POST /api/youtube/search` | Search available YouTube sources. |
@@ -547,6 +549,22 @@ python -m evaluation.run_evaluation \
 ```
 
 The same evaluator is integrated into `quality_gate.py`, so content quality is now based on both the existing publication heuristics and evidence-aware evaluation.
+
+### Operational observability
+
+The API exposes a replayable job timeline and dependency-free operational metrics. This makes long-running AI executions inspectable without requiring an external monitoring stack.
+
+```text
+GET /api/jobs/<job-id>/metrics
+
+status              completed
+retry_count         0
+duration_seconds    155.3
+event_count         8
+status_transitions  queued=1, running=1, completed=1
+```
+
+Every HTTP response also includes an `X-Request-ID` correlation header so API requests can be connected to application logs and support investigations.
 
 ### Why this matters
 
