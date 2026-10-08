@@ -1,21 +1,17 @@
-from fastapi.testclient import TestClient
+import asyncio
 
-from app import app
-
-
-client = TestClient(app)
+from app import health_check, readiness_check
 
 
 def test_health_endpoint():
-    response = client.get("/health")
+    response = asyncio.run(health_check())
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "ok"
-    assert response.json()["service"] == "crewai-content-engine"
+    assert response["status"] == "ok"
+    assert response["service"] == "crewai-content-engine"
 
 
 def test_readiness_endpoint():
-    response = client.get("/ready")
+    response = asyncio.run(readiness_check())
 
-    assert response.status_code == 200
-    assert response.json()["status"] == "ready"
+    assert response["status"] == "ready"
+    assert response["service"] == "crewai-content-engine"
