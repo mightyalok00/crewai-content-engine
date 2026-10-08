@@ -33,17 +33,17 @@ RECOVERY_SECONDS = int(os.getenv("JOB_RECOVERY_SECONDS", "300"))
 WORKER_ID = os.getenv("WORKER_ID", "worker-1")
 
 
-def _heartbeat_loop(job_id: str, stop: threading.Event) -> None:
+def _heartbeat_loop(job_id: str, lease_token: str, stop: threading.Event) -> None:
     interval = max(5, min(30, RECOVERY_SECONDS // 3))
     while not stop.wait(interval):
-        heartbeat(job_id)
+        heartbeat(job_id, lease_token)
 
 
 def process_job(job: dict) -> None:
     job_id = job["job_id"]
     stop = threading.Event()
     heartbeat_thread = threading.Thread(
-        target=_heartbeat_loop, args=(job_id, stop), daemon=True
+        target=_heartbeat_loop, args=(job_id, lease_token, stop), daemon=True
     )
     heartbeat_thread.start()
     try:
@@ -84,7 +84,7 @@ def process_job(job: dict) -> None:
         )
         append_event(job_id, "log", {"message": "Job completed successfully.", "level": "success"})
     except Exception as exc:
-        job_after_failure = mark_failure(job_id, str(exc))
+        job_after_failure = mark_failure(job_id, str(exc), lease_token)
         append_event(
             job_id,
             "log",
@@ -102,7 +102,7 @@ def main() -> None:
     print(f"Worker started: id={WORKER_ID}, poll={POLL_SECONDS}s")
     while True:
         recover_stale_jobs(RECOVERY_SECONDS)
-        job = claim_next_job()
+        job = claim_next_job(WORKER_ID)
         if job:
             process_job(job)
         else:
