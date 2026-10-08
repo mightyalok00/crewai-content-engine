@@ -46,8 +46,12 @@ jobs:
       - name: Compile Python
         run: python -m compileall -q .
 
-      - name: Run tests
-        run: python -m pytest -q
+      - name: Run tests with coverage
+        run: >
+          python -m pytest -q
+          --cov=.
+          --cov-report=term-missing
+          --cov-report=xml
 
       - name: Run AI evaluation benchmark
         run: >
