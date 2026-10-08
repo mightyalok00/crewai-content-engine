@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from pathlib import Path
 
 from models import ContentEvaluationReport, VerificationReport
@@ -21,5 +20,5 @@ def evaluate_file(content_path: str | Path, verification_path: str | Path | None
         verification = VerificationReport.model_validate_json(Path(verification_path).read_text(encoding="utf-8"))
     report = evaluate_package(content, verification, minimum_score=minimum_score)
     if output_path:
-        Path(output_path).write_text(json.dumps(asdict(report), indent=2), encoding="utf-8")
+        Path(output_path).write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
     return report
