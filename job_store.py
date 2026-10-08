@@ -100,7 +100,7 @@ def get_events(job_id: str, after_id: int = 0) -> list[dict[str, Any]]:
              **json.loads(r["payload_json"]), "at": r["created_at"]} for r in rows]
 
 
-def _update(job_id: str, lease_token: str | None = None, **changes: Any) -> dict[str, Any]:
+def _update(job_id: str, expected_lease_token: str | None = None, **changes: Any) -> dict[str, Any]:
     allowed = {"status", "error", "artifacts", "started_at", "finished_at",
                "heartbeat_at", "retry_count", "max_retries", "worker_id", "lease_token"}
     fields = {k: v for k, v in changes.items() if k in allowed}
@@ -108,8 +108,8 @@ def _update(job_id: str, lease_token: str | None = None, **changes: Any) -> dict
         fields["artifacts"] = json.dumps(fields["artifacts"])
     fields["updated_at"] = _now()
     assignments = ", ".join(f"{k} = ?" for k in fields)
-    where = "job_id = ?" + (" AND lease_token = ?" if lease_token else "")
-    params = (*fields.values(), job_id) if not lease_token else (*fields.values(), job_id, lease_token)
+    where = "job_id = ?" + (" AND lease_token = ?" if expected_lease_token else "")
+    params = (*fields.values(), job_id) if not expected_lease_token else (*fields.values(), job_id, expected_lease_token)
     with _connect() as conn:
         cur = conn.execute(f"UPDATE jobs SET {assignments} WHERE {where}", params)
     if cur.rowcount != 1:
