@@ -235,6 +235,7 @@ crewai-content-engine/
 ├── quality_gate.py            # Deterministic content quality scoring
 ├── security.py               # API/admin/webhook security controls
 ├── image_gen.py              # Cover-art generation
+├── observability.py          # Correlation IDs + job metrics
 ├── app.py                    # FastAPI application
 │
 ├── static/
@@ -579,7 +580,7 @@ This evaluation layer creates a repeatable quality signal that can be expanded w
 - Model and prompt regression tracking
 - Cost/quality comparisons across providers
 
-The CI pipeline runs a deterministic evaluation benchmark on every supported Python version.
+The CI pipeline runs a deterministic evaluation benchmark on every supported Python version and publishes test coverage in the CI logs.
 
 
 ---
@@ -603,7 +604,9 @@ The CI pipeline runs a deterministic evaluation benchmark on every supported Pyt
 - [x] Dependency security workflow
 - [ ] Pluggable PostgreSQL/Redis job backend
 - [ ] Distributed object storage for artifacts
-- [ ] Advanced run observability and metrics
+- [x] Replayable run observability and job metrics
+- [x] Correlation IDs for API requests
+- [ ] Advanced external metrics/tracing backend
 - [ ] More publishing integrations
 
 ---
