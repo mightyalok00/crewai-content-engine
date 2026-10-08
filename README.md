@@ -628,7 +628,7 @@ A good contribution should:
 
 ## 📄 License
 
-See the repository for the current license and project terms.
+This project is licensed under the [MIT License](LICENSE). See the `LICENSE` file for the full license text.
 
 ---
 
