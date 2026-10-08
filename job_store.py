@@ -182,6 +182,7 @@ def recover_stale_jobs(timeout_seconds: int = 300) -> int:
     """Requeue jobs abandoned by a crashed worker."""
     cutoff = datetime.now(timezone.utc) - timedelta(seconds=timeout_seconds)
     cutoff_iso = cutoff.isoformat()
+    recovered_events: list[tuple[str, str, int]] = []
     with _connect() as conn:
         rows = conn.execute(
             """SELECT job_id FROM jobs
@@ -195,12 +196,8 @@ def recover_stale_jobs(timeout_seconds: int = 300) -> int:
                 (row["job_id"],),
             ).fetchone()
             next_retry = int(job["retry_count"]) + 1
-            if next_retry <= int(job["max_retries"]):
-                status = "queued"
-                finished_at = None
-            else:
-                status = "failed"
-                finished_at = _now()
+            status = "queued" if next_retry <= int(job["max_retries"]) else "failed"
+            finished_at = None if status == "queued" else _now()
             conn.execute(
                 """UPDATE jobs
                    SET status=?, retry_count=?, error=?,
@@ -215,13 +212,14 @@ def recover_stale_jobs(timeout_seconds: int = 300) -> int:
                     row["job_id"],
                 ),
             )
-            append_event(
-                row["job_id"],
-                "status",
-                {"status": status, "reason": "worker_recovery", "retry_count": next_retry},
-            )
-    return len(rows)
-
+            recovered_events.append((row["job_id"], status, next_retry))
+    for job_id, status, retry_count in recovered_events:
+        append_event(
+            job_id,
+            "status",
+            {"status": status, "reason": "worker_recovery", "retry_count": retry_count},
+        )
+    return len(recovered_events)
 
 def mark_failure(job_id: str, error: str) -> dict[str, Any]:
     job = get_job(job_id)
