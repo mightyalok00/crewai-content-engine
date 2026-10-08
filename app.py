@@ -7,13 +7,11 @@ import urllib.request
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-
-from security import require_local_admin, safe_webhook_url, post_json, Field
 
 from security import require_local_admin, safe_webhook_url, post_json
 
@@ -52,7 +50,7 @@ class GenerateRequest(BaseModel):
 
 
 class YouTubeInspectRequest(BaseModel):
-    url: str = Field(..., min_length=1, max_length=2048) = Field(..., min_length=1, max_length=2048)
+    url: str = Field(..., min_length=1, max_length=2048)
 
 
 class SettingsRequest(BaseModel):
@@ -63,7 +61,7 @@ class SettingsRequest(BaseModel):
 
 
 class WebhookPublishRequest(BaseModel):
-    webhook_url: str = Field(..., min_length=8, max_length=2048) = Field(..., min_length=8, max_length=2048)
+    webhook_url: str = Field(..., min_length=8, max_length=2048)
     topic: str
     channel: str = ""
     markdown_content: str
@@ -311,10 +309,6 @@ async def get_latest_cover():
 async def publish_webhook(req: WebhookPublishRequest, request: Request):
     require_local_admin(request)
     url = safe_webhook_url(req.webhook_url)
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid Webhook URL. Must begin with http:// or https://",
-        )
 
     payload = {
         "event": "crewai.studio.master_package.published",
@@ -467,188 +461,49 @@ async def export_html(req: HtmlExportRequest, request: Request):
 
 @app.post("/api/generate")
 async def generate_blog(req: GenerateRequest):
-    raw_topic = req.topic.strip()
-    raw_channel = req.channel.strip() or "@krishnaik06"
+    """Backward-compatible generation endpoint.
 
-    if not raw_topic and not raw_channel:
-        raise HTTPException(
-            status_code=400,
-            detail="Please provide a topic or YouTube video URL",
-        )
+    New clients should use POST /api/jobs and poll /api/jobs/{job_id}.
+    """
+    from jobs import create_job, get_job
 
-    # Smart YouTube URL detection & resolution
-    from tools import extract_video_id, get_video_oembed_info
-
-    detected_vid = extract_video_id(raw_topic) or extract_video_id(raw_channel)
-    video_meta = {}
-    if detected_vid:
-        video_meta = get_video_oembed_info(detected_vid)
-
-    # Determine effective topic title
-    if extract_video_id(raw_topic):
-        resolved_title = video_meta.get(
-            "title", f"YouTube Video ({detected_vid})"
-        )
-        topic = resolved_title
-    else:
-        topic = raw_topic or video_meta.get(
-            "title", "AI & Technology Master Insights"
-        )
-
-    # Determine effective channel / URL parameter
-    if detected_vid:
-        author = video_meta.get("author_name", "")
-        direct_url = f"https://www.youtube.com/watch?v={detected_vid}"
-        channel = f"{author} ({direct_url})" if author else direct_url
-    else:
-        channel = raw_channel
-
-    async def event_generator():
-        load_dotenv(override=True)
-        memory_active = os.getenv("CREW_MEMORY_ENABLED", "true").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
-        embedder_name = os.getenv("EMBEDDER_PROVIDER", "onnx")
-
-        yield (
-            f"data:"
-            f" {json.dumps({'type': 'log', 'message': f'Initializing Autonomous 9-Agent Master Studio for: {topic}', 'level': 'log-info'})}\n\n"
-        )
-        if detected_vid:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': f'📺 Detected YouTube Video ID: {detected_vid} | Source: {channel}', 'level': 'log-success'})}\n\n"
-            )
-        else:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': f'Target Channel/Source: {channel}', 'level': 'log-info'})}\n\n"
-            )
-
-        if memory_active:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': f'🧠 Contextual Memory Engine: Active ({embedder_name.upper()} LanceDB Vector Store)', 'level': 'log-success'})}\n\n"
-            )
-        else:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': '🧠 Contextual Memory Engine: Disabled', 'level': 'log-warn'})}\n\n"
-            )
-
-        # Capture output from Crew execution
-        class StreamLogger(io.TextIOBase):
-            def __init__(self, queue, loop):
-                self.queue = queue
-                self.loop = loop
-
-            def write(self, s):
-                if s and s.strip():
-                    asyncio.run_coroutine_threadsafe(
-                        self.queue.put(
-                            {
-                                "type": "log",
-                                "message": s.strip(),
-                                "level": "log-info",
-                            }
-                        ),
-                        self.loop,
-                    )
-                return len(s)
-
-        log_queue = asyncio.Queue()
-        loop = asyncio.get_running_loop()
-
-        def run_crew_sync():
-            from crew import create_blog_crew
-
-            try:
-                active_crew = create_blog_crew()
-                res = active_crew.kickoff(
-                    inputs={"topic": topic, "channel": channel}
-                )
-                return str(res)
-            except Exception as err:
-                return f"__ERROR__: {err!s}"
-
-        # Run crew kickoff in a background thread
-        future = loop.run_in_executor(None, run_crew_sync)
-
-        while not future.done():
-            try:
-                event = await asyncio.wait_for(log_queue.get(), timeout=0.3)
-                yield f"data: {json.dumps(event)}\n\n"
-            except asyncio.TimeoutError:
-                await asyncio.sleep(0.1)
-
-        result = await future
-
-        if result.startswith("__ERROR__:"):
-            err_msg = result.replace("__ERROR__:", "").strip()
-            yield f"data: {json.dumps({'type': 'error', 'message': err_msg})}\n\n"
-        else:
-            # Check all deliverable output files
-            final_content = (
-                OUTPUT_FILE.read_text(encoding="utf-8", errors="replace")
-                if OUTPUT_FILE.exists()
-                else result
-            )
-            social_content = (
-                SOCIAL_FILE.read_text(encoding="utf-8", errors="replace")
-                if SOCIAL_FILE.exists()
-                else ""
-            )
-            podcast_content = (
-                PODCAST_FILE.read_text(encoding="utf-8", errors="replace")
-                if PODCAST_FILE.exists()
-                else ""
-            )
-            newsletter_content = (
-                NEWSLETTER_FILE.read_text(encoding="utf-8", errors="replace")
-                if NEWSLETTER_FILE.exists()
-                else ""
-            )
-
-            # Generate AI Cover Banner Art automatically
-            cover_url = ""
-            try:
-                from image_gen import generate_cover_banner
-
-                cover_res = generate_cover_banner(
-                    topic=topic, channel=channel, style_key="3d_tech"
-                )
-                if cover_res.get("success"):
-                    cover_url = cover_res.get("image_url", "")
-                    yield (
-                        f"data:"
-                        f" {json.dumps({'type': 'log', 'message': f'🎨 AI Cover Banner Generated: {cover_url}', 'level': 'log-success'})}\n\n"
-                    )
-            except (
-                RuntimeError,
-                ValueError,
-                TypeError,
-                OSError,
-                KeyError,
-            ) as err:
-                yield (
-                    f"data:"
-                    f" {json.dumps({'type': 'log', 'message': f'[WARN] Cover banner generation: {err!s}', 'level': 'log-warn'})}\n\n"
-                )
-
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'complete', 'result': final_content, 'social': social_content, 'podcast': podcast_content, 'newsletter': newsletter_content, 'cover_url': cover_url, 'resolved_topic': topic})}\n\n"
-            )
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    job = create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06")
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "status_url": f"/api/jobs/{job['job_id']}",
+        "events_url": f"/api/jobs/{job['job_id']}/events",
+    }
 
 
-if __name__ == "__main__":
-    import uvicorn
+@app.post("/api/jobs")
+async def create_generation_job(req: GenerateRequest):
+    from jobs import create_job
+    return create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06")
 
-    print("\n" + "=" * 60)
-    print("🚀 Starting CrewAI 9-Agent Master Studio on http://localhost:8000")
-    print("=" * 60 + "\n")
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+@app.get("/api/jobs/{job_id}")
+async def get_generation_job(job_id: str):
+    from jobs import get_job
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@app.get("/api/jobs/{job_id}/events")
+async def stream_generation_events(job_id: str):
+    from jobs import event_stream
+    if not await event_stream.exists(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return StreamingResponse(event_stream.iter(job_id), media_type="text/event-stream")
+
+
+@app.get("/api/jobs/{job_id}/artifacts")
+async def get_generation_artifacts(job_id: str):
+    from jobs import get_job
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"job_id": job_id, "artifacts": job.get("artifacts", {})}
+
