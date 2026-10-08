@@ -22,7 +22,28 @@ if sys.platform == "win32":
 
 load_dotenv(override=True)
 
-app = FastAPI(title="CrewAI Studio API", version="3.5.0")
+app = FastAPI(title="CrewAI Studio API", version="3.6.0")
+
+
+@app.get("/health")
+async def health_check():
+    """Liveness probe: confirms the API process is running."""
+    return {"status": "ok", "service": "crewai-content-engine", "version": app.version}
+
+
+@app.get("/ready")
+async def readiness_check():
+    """Readiness probe: confirms the persistent job store is reachable."""
+    try:
+        from job_store import get_job
+
+        # A missing ID is expected; this exercises the configured SQLite store
+        # without creating or mutating application state.
+        get_job("__readiness_probe__")
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Job store unavailable: {exc!s}") from exc
+    return {"status": "ready", "service": "crewai-content-engine", "version": app.version}
+
 
 app.add_middleware(
     CORSMiddleware,
