@@ -7,11 +7,13 @@ import urllib.request
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from security import require_local_admin, safe_webhook_url, post_json
 
 # Configure UTF-8 encoding on Windows
 if sys.platform == "win32":
@@ -24,10 +26,10 @@ app = FastAPI(title="CrewAI Studio API", version="3.5.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(","),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -43,23 +45,24 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 class GenerateRequest(BaseModel):
-    topic: str
-    channel: str = "@krishnaik06"
+    topic: str = Field(..., min_length=1, max_length=500)
+    channel: str = Field("@krishnaik06", max_length=500)
+    max_retries: int = Field(2, ge=0, le=5)
 
 
 class YouTubeInspectRequest(BaseModel):
-    url: str
+    url: str = Field(..., min_length=1, max_length=2048)
 
 
 class SettingsRequest(BaseModel):
-    api_key: str
-    model_name: str
+    api_key: str = Field(..., min_length=10, max_length=500)
+    model_name: str = Field(..., min_length=1, max_length=200)
     memory_enabled: bool = True
-    embedder_provider: str = "onnx"
+    embedder_provider: str = Field("onnx", pattern="^(onnx|google|openai)$")
 
 
 class WebhookPublishRequest(BaseModel):
-    webhook_url: str
+    webhook_url: str = Field(..., min_length=8, max_length=2048)
     topic: str
     channel: str = ""
     markdown_content: str
@@ -75,8 +78,8 @@ class CoverGenerateRequest(BaseModel):
 
 
 class HtmlExportRequest(BaseModel):
-    topic: str
-    html_body: str
+    topic: str = Field(..., min_length=1, max_length=500)
+    html_body: str = Field(..., min_length=1, max_length=2_000_000)
 
 
 @app.post("/api/youtube/inspect")
@@ -133,7 +136,8 @@ async def get_latest_article():
 
 
 @app.get("/api/settings")
-async def get_settings():
+async def get_settings(request: Request):
+    require_local_admin(request)
     load_dotenv(override=True)
     memory_enabled = os.getenv("CREW_MEMORY_ENABLED", "true").lower() in (
         "true",
@@ -150,7 +154,7 @@ async def get_settings():
         or "gemini/gemini-3.7-flash"
     )
     return {
-        "api_key": api_key,
+        "api_key_configured": bool(api_key),
         "model_name": model_name,
         "provider": "google-ai-studio",
         "memory_enabled": memory_enabled,
@@ -159,7 +163,8 @@ async def get_settings():
 
 
 @app.post("/api/settings")
-async def save_settings(req: SettingsRequest):
+async def save_settings(req: SettingsRequest, request: Request):
+    require_local_admin(request)
     memory_str = "true" if req.memory_enabled else "false"
 
     env_content = (
@@ -302,13 +307,9 @@ async def get_latest_cover():
 
 
 @app.post("/api/publish-webhook")
-async def publish_webhook(req: WebhookPublishRequest):
-    url = req.webhook_url.strip()
-    if not url.startswith(("http://", "https://")):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid Webhook URL. Must begin with http:// or https://",
-        )
+async def publish_webhook(req: WebhookPublishRequest, request: Request):
+    require_local_admin(request)
+    url = safe_webhook_url(req.webhook_url)
 
     payload = {
         "event": "crewai.studio.master_package.published",
@@ -332,7 +333,7 @@ async def publish_webhook(req: WebhookPublishRequest):
             },
             method="POST",
         )
-        with urllib.request.urlopen(http_req, timeout=15) as response:
+        with post_json(url, payload, timeout=15) as response:
             status_code = response.getcode()
             body = response.read().decode("utf-8", errors="replace")
             return status_code, body[:500]
@@ -353,7 +354,10 @@ async def publish_webhook(req: WebhookPublishRequest):
 
 
 @app.post("/api/export-html")
-async def export_html(req: HtmlExportRequest):
+async def export_html(req: HtmlExportRequest, request: Request):
+    require_local_admin(request)
+    # The exported body is intentionally treated as HTML. This endpoint is local-only in the
+    # production profile; callers should sanitize untrusted content before publishing it.
     styled_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -458,188 +462,49 @@ async def export_html(req: HtmlExportRequest):
 
 @app.post("/api/generate")
 async def generate_blog(req: GenerateRequest):
-    raw_topic = req.topic.strip()
-    raw_channel = req.channel.strip() or "@krishnaik06"
+    """Backward-compatible generation endpoint.
 
-    if not raw_topic and not raw_channel:
-        raise HTTPException(
-            status_code=400,
-            detail="Please provide a topic or YouTube video URL",
-        )
+    New clients should use POST /api/jobs and poll /api/jobs/{job_id}.
+    """
+    from jobs import create_job
 
-    # Smart YouTube URL detection & resolution
-    from tools import extract_video_id, get_video_oembed_info
-
-    detected_vid = extract_video_id(raw_topic) or extract_video_id(raw_channel)
-    video_meta = {}
-    if detected_vid:
-        video_meta = get_video_oembed_info(detected_vid)
-
-    # Determine effective topic title
-    if extract_video_id(raw_topic):
-        resolved_title = video_meta.get(
-            "title", f"YouTube Video ({detected_vid})"
-        )
-        topic = resolved_title
-    else:
-        topic = raw_topic or video_meta.get(
-            "title", "AI & Technology Master Insights"
-        )
-
-    # Determine effective channel / URL parameter
-    if detected_vid:
-        author = video_meta.get("author_name", "")
-        direct_url = f"https://www.youtube.com/watch?v={detected_vid}"
-        channel = f"{author} ({direct_url})" if author else direct_url
-    else:
-        channel = raw_channel
-
-    async def event_generator():
-        load_dotenv(override=True)
-        memory_active = os.getenv("CREW_MEMORY_ENABLED", "true").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
-        embedder_name = os.getenv("EMBEDDER_PROVIDER", "onnx")
-
-        yield (
-            f"data:"
-            f" {json.dumps({'type': 'log', 'message': f'Initializing Autonomous 9-Agent Master Studio for: {topic}', 'level': 'log-info'})}\n\n"
-        )
-        if detected_vid:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': f'📺 Detected YouTube Video ID: {detected_vid} | Source: {channel}', 'level': 'log-success'})}\n\n"
-            )
-        else:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': f'Target Channel/Source: {channel}', 'level': 'log-info'})}\n\n"
-            )
-
-        if memory_active:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': f'🧠 Contextual Memory Engine: Active ({embedder_name.upper()} LanceDB Vector Store)', 'level': 'log-success'})}\n\n"
-            )
-        else:
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'log', 'message': '🧠 Contextual Memory Engine: Disabled', 'level': 'log-warn'})}\n\n"
-            )
-
-        # Capture output from Crew execution
-        class StreamLogger(io.TextIOBase):
-            def __init__(self, queue, loop):
-                self.queue = queue
-                self.loop = loop
-
-            def write(self, s):
-                if s and s.strip():
-                    asyncio.run_coroutine_threadsafe(
-                        self.queue.put(
-                            {
-                                "type": "log",
-                                "message": s.strip(),
-                                "level": "log-info",
-                            }
-                        ),
-                        self.loop,
-                    )
-                return len(s)
-
-        log_queue = asyncio.Queue()
-        loop = asyncio.get_running_loop()
-
-        def run_crew_sync():
-            from crew import create_blog_crew
-
-            try:
-                active_crew = create_blog_crew()
-                res = active_crew.kickoff(
-                    inputs={"topic": topic, "channel": channel}
-                )
-                return str(res)
-            except Exception as err:
-                return f"__ERROR__: {err!s}"
-
-        # Run crew kickoff in a background thread
-        future = loop.run_in_executor(None, run_crew_sync)
-
-        while not future.done():
-            try:
-                event = await asyncio.wait_for(log_queue.get(), timeout=0.3)
-                yield f"data: {json.dumps(event)}\n\n"
-            except asyncio.TimeoutError:
-                await asyncio.sleep(0.1)
-
-        result = await future
-
-        if result.startswith("__ERROR__:"):
-            err_msg = result.replace("__ERROR__:", "").strip()
-            yield f"data: {json.dumps({'type': 'error', 'message': err_msg})}\n\n"
-        else:
-            # Check all deliverable output files
-            final_content = (
-                OUTPUT_FILE.read_text(encoding="utf-8", errors="replace")
-                if OUTPUT_FILE.exists()
-                else result
-            )
-            social_content = (
-                SOCIAL_FILE.read_text(encoding="utf-8", errors="replace")
-                if SOCIAL_FILE.exists()
-                else ""
-            )
-            podcast_content = (
-                PODCAST_FILE.read_text(encoding="utf-8", errors="replace")
-                if PODCAST_FILE.exists()
-                else ""
-            )
-            newsletter_content = (
-                NEWSLETTER_FILE.read_text(encoding="utf-8", errors="replace")
-                if NEWSLETTER_FILE.exists()
-                else ""
-            )
-
-            # Generate AI Cover Banner Art automatically
-            cover_url = ""
-            try:
-                from image_gen import generate_cover_banner
-
-                cover_res = generate_cover_banner(
-                    topic=topic, channel=channel, style_key="3d_tech"
-                )
-                if cover_res.get("success"):
-                    cover_url = cover_res.get("image_url", "")
-                    yield (
-                        f"data:"
-                        f" {json.dumps({'type': 'log', 'message': f'🎨 AI Cover Banner Generated: {cover_url}', 'level': 'log-success'})}\n\n"
-                    )
-            except (
-                RuntimeError,
-                ValueError,
-                TypeError,
-                OSError,
-                KeyError,
-            ) as err:
-                yield (
-                    f"data:"
-                    f" {json.dumps({'type': 'log', 'message': f'[WARN] Cover banner generation: {err!s}', 'level': 'log-warn'})}\n\n"
-                )
-
-            yield (
-                f"data:"
-                f" {json.dumps({'type': 'complete', 'result': final_content, 'social': social_content, 'podcast': podcast_content, 'newsletter': newsletter_content, 'cover_url': cover_url, 'resolved_topic': topic})}\n\n"
-            )
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    job = create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06", req.max_retries)
+    return {
+        "job_id": job["job_id"],
+        "status": job["status"],
+        "status_url": f"/api/jobs/{job['job_id']}",
+        "events_url": f"/api/jobs/{job['job_id']}/events",
+    }
 
 
-if __name__ == "__main__":
-    import uvicorn
+@app.post("/api/jobs")
+async def create_generation_job(req: GenerateRequest):
+    from jobs import create_job
+    return create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06", req.max_retries)
 
-    print("\n" + "=" * 60)
-    print("🚀 Starting CrewAI 9-Agent Master Studio on http://localhost:8000")
-    print("=" * 60 + "\n")
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+@app.get("/api/jobs/{job_id}")
+async def get_generation_job(job_id: str):
+    from jobs import get_job
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@app.get("/api/jobs/{job_id}/events")
+async def stream_generation_events(job_id: str):
+    from jobs import event_stream
+    if not await event_stream.exists(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    return StreamingResponse(event_stream.iter(job_id), media_type="text/event-stream")
+
+
+@app.get("/api/jobs/{job_id}/artifacts")
+async def get_generation_artifacts(job_id: str):
+    from jobs import get_job
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"job_id": job_id, "artifacts": job.get("artifacts", {})}
+

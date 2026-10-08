@@ -131,3 +131,127 @@ Or pass custom topic and channel arguments:
 ```bash
 python crew.py "LangChain vs CrewAI" "@freecodecamp"
 ```
+
+
+## 🛡️ Production Engineering Upgrade
+
+The project now includes a production-hardening layer while keeping the existing Studio UI and 9-agent workflow intact.
+
+### Security
+- API keys are never returned by GET /api/settings; the response exposes only api_key_configured.
+- Admin/settings/export/webhook operations are localhost-restricted by default.
+- Remote admin access requires APP_API_TOKEN and a Bearer token.
+- CORS defaults to localhost origins instead of wildcard access.
+- Webhook URLs are validated against private, loopback, link-local, multicast, and reserved addresses.
+- Webhook redirects are disabled to reduce SSRF risk.
+- Request models enforce size and enum constraints with Pydantic.
+
+### Quality Engineering
+- models.py provides typed contracts for research, evidence, verification, quality reports, and artifacts.
+- quality_gate.py provides a deterministic post-generation quality score and blockers for future regeneration loops.
+- tests/ covers the security boundary, Pydantic validation, and quality-gate behavior.
+- .github/workflows/ci.yml runs syntax checks and tests on Python 3.11 and 3.12.
+- .github/workflows/security.yml runs scheduled pip-audit dependency checks.
+
+### Local configuration
+Copy .env.example to .env. For a local-only installation, leave APP_API_TOKEN empty. If the application is exposed through a reverse proxy or network interface, set a strong token and restrict the proxy/firewall as well.
+
+## ⚡ Asynchronous Job API
+
+Generation now supports request-scoped jobs instead of forcing clients to keep a single HTTP request open for the entire CrewAI run.
+
+### Flow
+`POST /api/jobs` → returns `job_id` → `GET /api/jobs/{job_id}` for status → `GET /api/jobs/{job_id}/events` for SSE logs → `GET /api/jobs/{job_id}/artifacts` for generated outputs.
+
+The legacy `POST /api/generate` endpoint remains available and now returns the same `job_id` contract, allowing the existing frontend to migrate incrementally.
+
+Generated artifacts are stored under `artifacts/{job_id}/attempt-{retry}-{lease}/`. Each worker execution attempt gets its own directory, preventing a stale worker from overwriting a replacement worker's files.
+
+
+## 🧵 Persistent Worker Architecture
+
+Generation is now decoupled from the FastAPI process.
+
+### Production flow
+
+~~~text
+Client
+  │
+  ▼
+FastAPI ──► SQLite Job Store
+                 │
+                 ▼
+          Persistent Job Queue
+                 │
+          ┌──────┴──────┐
+          ▼             ▼
+      Worker 1       Worker 2
+          │             │
+          └──────┬──────┘
+                 ▼
+             CrewAI 9-Agent
+                 │
+                 ▼
+      artifacts/{job_id}/attempt-*/
+~~~
+
+### Worker behavior
+
+Run the API and worker separately:
+
+~~~bash
+python app.py
+python worker.py
+~~~
+
+Each worker executes one CrewAI job at a time. To increase throughput, run additional worker processes with unique `WORKER_ID` values. SQLite atomically claims queued jobs so two workers cannot claim the same job.
+
+The job store provides:
+- **Persistent state** in SQLite instead of process memory.
+- **Replayable SSE events** stored in the database.
+- **Bounded retries** with configurable `max_retries`.
+- **Heartbeat-based crash recovery** for abandoned running jobs.
+- **Request-scoped artifact directories** so generated files belong to one job.
+- **Atomic job claiming** across multiple worker processes.
+- **One CrewAI execution per worker process** to avoid shared CrewAI task state collisions.
+- **Fenced worker leases** so stale workers cannot complete or fail a job after recovery.
+- **Per-attempt artifact isolation** so stale executions cannot overwrite replacement outputs.
+
+### Example
+
+~~~text
+POST /api/jobs
+      ↓
+job_id = abc123
+      ↓
+status = queued
+      ↓
+worker claims job
+      ↓
+status = running
+      ↓
+9 agents execute
+      ↓
+quality/artifacts saved
+      ↓
+status = completed
+~~~
+
+If an execution fails, the worker retries until `max_retries` is exhausted. If a worker crashes, another worker can recover the stale job after the configured heartbeat timeout.
+
+### Scaling
+
+For a local machine:
+
+~~~bash
+python worker.py
+~~~
+
+For higher throughput, run multiple worker processes:
+
+~~~bash
+WORKER_ID=worker-1 python worker.py
+WORKER_ID=worker-2 python worker.py
+~~~
+
+For larger multi-machine deployments, the SQLite job-store interface can later be replaced by PostgreSQL/Redis without changing the public job API.

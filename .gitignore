@@ -35,3 +35,6 @@ Thumbs.db
 .chromadb/
 db/
 embeddings_cache/
+
+# Runtime job artifacts and generated outputs
+artifacts/
