@@ -155,3 +155,14 @@ The project now includes a production-hardening layer while keeping the existing
 
 ### Local configuration
 Copy .env.example to .env. For a local-only installation, leave APP_API_TOKEN empty. If the application is exposed through a reverse proxy or network interface, set a strong token and restrict the proxy/firewall as well.
+
+## ⚡ Asynchronous Job API
+
+Generation now supports request-scoped jobs instead of forcing clients to keep a single HTTP request open for the entire CrewAI run.
+
+### Flow
+`POST /api/jobs` → returns `job_id` → `GET /api/jobs/{job_id}` for status → `GET /api/jobs/{job_id}/events` for SSE logs → `GET /api/jobs/{job_id}/artifacts` for generated outputs.
+
+The legacy `POST /api/generate` endpoint remains available and now returns the same `job_id` contract, allowing the existing frontend to migrate incrementally.
+
+Generated artifacts are copied into `artifacts/{job_id}/` so separate requests do not intentionally share the same output namespace.
