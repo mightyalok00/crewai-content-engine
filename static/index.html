@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CrewAI Multi-Agent Studio - Autonomous 9-Agent YouTube Content, SEO, Podcast & Newsletter Engine.">
+    <title>CrewAI Studio • Autonomous 9-Agent Master Engine</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Markdown Parser, Mermaid & Code Highlighter -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.8.0/dist/mermaid.min.js"></script>
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="ambient-glow glow-top"></div>
+    <div class="ambient-glow glow-bottom"></div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="app-layout">
+        <!-- Navigation Header -->
+        <header class="navbar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <span class="logo-icon">⚡</span>
+                </div>
+                <div class="brand-text">
+                    <h1>CrewAI <span>Studio</span></h1>
+                    <span class="badge">9-Agent Autonomous Engine</span>
+                </div>
+            </div>
+
+            <!-- Header Status & Live Metrics -->
+            <div class="header-actions">
+                <div class="timer-badge" id="sessionTimerBadge" title="Pipeline Execution Timer">
+                    <span class="timer-icon">⏱️</span>
+                    <span class="timer-text" id="sessionTimerText">00:00</span>
+                </div>
+
+                <div class="active-model-badge" id="activeModelBadge" title="Active Foundation Model">
+                    <span class="model-dot"></span>
+                    <span class="model-name-text" id="headerModelText">gemini-3.8-flash</span>
+                </div>
+
+                <div class="status-indicator online" id="statusIndicator">
+                    <span class="pulse-dot"></span>
+                    <span class="status-text" id="engineStatus">Engine Ready</span>
+                </div>
+
+                <div class="memory-badge active" id="memoryStatusBadge" title="Multi-Tier Contextual Memory (LanceDB + ONNX Embeddings)">
+                    <span class="memory-icon">🧠</span>
+                    <span class="memory-text" id="memoryStatusText">Memory: ON</span>
+                </div>
+
+                <button class="btn btn-secondary" id="openSettingsBtn" title="Configure API Keys, LLMs & Contextual Memory">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    <span>Config</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Left Panel: Input & Agent Controls -->
+            <section class="control-panel">
+                <div class="panel-header">
+                    <h2>Target Video & Knowledge Database</h2>
+                    <p>Search YouTube index, enter video URLs, or select topic presets for 9-agent autonomous synthesis.</p>
+                </div>
+
+                <form id="generateForm" class="control-form">
+                    <div class="form-group">
+                        <label for="topicInput">
+                            <span>Topic or YouTube Video URL</span>
+                            <span class="badge-pill-sub">Universal YouTube Index</span>
+                        </label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input 
+                                type="text" 
+                                id="topicInput" 
+                                placeholder="Paste URL: https://www.youtube.com/watch?v=... or query topic" 
+                                value="AI vs ML vs Data Science"
+                                required
+                            >
+                        </div>
+                        <div class="url-hint-bar">
+                            <span class="hint-text">Supported:</span>
+                            <span class="code-tag">youtube.com/watch?v=...</span>
+                            <span class="code-tag">youtu.be/...</span>
+                            <span class="code-tag">/shorts/...</span>
+                            <span class="code-tag">/live/...</span>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic YouTube Video Preview Card -->
+                    <div class="yt-preview-card" id="ytPreviewCard" style="display: none;">
+                        <div class="yt-thumb-wrapper">
+                            <img class="yt-thumb-img" id="ytThumbImg" src="" alt="YouTube Thumbnail">
+                            <div class="yt-play-icon">▶</div>
+                        </div>
+                        <div class="yt-preview-details">
+                            <div class="yt-preview-title" id="ytPreviewTitle">Detected YouTube Video</div>
+                            <div class="yt-preview-meta">
+                                <span class="yt-channel-badge" id="ytChannelBadge">Channel</span>
+                                <span>•</span>
+                                <span class="yt-transcript-pill available" id="ytTranscriptPill">🟢 Transcript Ready</span>
+                            </div>
+                        </div>
+                        <button type="button" class="yt-preview-close" id="ytPreviewClose" title="Clear detected video">&times;</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="channelInput">Target Channel / Specific Creator Source</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                            <input 
+                                type="text" 
+                                id="channelInput" 
+                                placeholder="@krishnaik06, @lexfridman, or direct URL" 
+                                value="@krishnaik06"
+                            >
+                        </div>
+                    </div>
+
+                    <!-- Quick Model Selector Bar -->
+                    <div class="model-quick-bar">
+                        <span class="suggestions-label">🤖 Google AI Studio Engine:</span>
+                        <div class="model-quick-chips">
+                            <button type="button" class="quick-model-chip active" data-model="gemini/gemini-3.8-flash">⚡ Gemini 3.8 Flash (Recommended)</button>
+                            <button type="button" class="quick-model-chip" data-model="gemini/gemini-3.7-flash">🧠 Gemini 3.7 Flash</button>
+                            <button type="button" class="quick-model-chip" data-model="gemini/gemini-2.5-pro">🔬 Gemini 2.5 Pro</button>
+                            <button type="button" class="quick-model-chip" data-model="gemini/gemini-flash-latest">🌟 Gemini Flash Latest</button>
+                        </div>
+                    </div>
+
+                    <!-- Universal YouTube URL Presets -->
+                    <div class="channel-presets">
+                        <span class="suggestions-label">🎬 YouTube Video Presets (Click to Load):</span>
+                        <div class="channel-chips">
+                            <button type="button" class="channel-chip yt-chip" data-url="https://www.youtube.com/watch?v=zjkBMFhNj_g" data-name="Karpathy LLMs">🧠 Karpathy LLMs</button>
+                            <button type="button" class="channel-chip yt-chip" data-url="https://www.youtube.com/watch?v=aircAruvnKk" data-name="3Blue1Brown Neural Nets">📊 3Blue1Brown Neural Nets</button>
+                            <button type="button" class="channel-chip yt-chip" data-url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" data-name="Rick Astley Classic">🎵 Rick Astley Classic</button>
+                            <button type="button" class="channel-chip yt-chip" data-url="https://www.youtube.com/shorts/3i_J3gP9F20" data-name="YouTube Shorts">⚡ YouTube Shorts</button>
+                            <button type="button" class="channel-chip active" data-channel="@krishnaik06">Krish Naik</button>
+                            <button type="button" class="channel-chip" data-channel="@freecodecamp">freeCodeCamp</button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Suggestions -->
+                    <div class="suggestions-container">
+                        <span class="suggestions-label">💡 Quick Topic Presets:</span>
+                        <div class="suggestion-chips">
+                            <button type="button" class="chip" data-topic="AI vs ML vs Data Science">AI vs ML vs Data Science</button>
+                            <button type="button" class="chip" data-topic="LangChain vs CrewAI Comparison">LangChain vs CrewAI</button>
+                            <button type="button" class="chip" data-topic="Complete Generative AI Roadmap">GenAI Roadmap</button>
+                            <button type="button" class="chip" data-topic="Fine-Tuning LLMs with LoRA">Fine-Tuning LLMs</button>
+                        </div>
+                    </div>
+
+                    <!-- Action Button -->
+                    <button type="submit" class="btn btn-primary btn-kickoff" id="startBtn">
+                        <span class="btn-icon">🚀</span>
+                        <span class="btn-text">Launch 9-Agent Master Crew</span>
+                    </button>
+                </form>
+
+                <!-- Interactive Agent Pipeline Visualizer -->
+                <div class="pipeline-section">
+                    <div class="pipeline-header-row">
+                        <h3 class="section-title">Autonomous 9-Agent Pipeline</h3>
+                        <span class="pipeline-mode-pill">Collaborative Delegation Active</span>
+                    </div>
+                    
+                    <div class="pipeline-flow">
+                        <!-- Node 1: Input -->
+                        <div class="pipeline-node node-idle" id="nodeInput">
+                            <div class="node-icon">🎯</div>
+                            <div class="node-content">
+                                <div class="node-title">Query & Source</div>
+                                <div class="node-sub" id="nodeInputTopic">AI vs ML vs Data Science</div>
+                            </div>
+                            <div class="node-status-badge">Input</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector1"></div>
+
+                        <!-- Node 2: YouTube Researcher -->
+                        <div class="pipeline-node node-idle" id="nodeResearcher">
+                            <div class="node-icon">🔍</div>
+                            <div class="node-content">
+                                <div class="node-title">1. Researcher</div>
+                                <div class="node-sub">Transcribes & Extracts Quotes</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector2"></div>
+
+                        <!-- Node 3: Benchmark & Cross-Verifier -->
+                        <div class="pipeline-node node-idle" id="nodeCrossVerifier">
+                            <div class="node-icon">🌐</div>
+                            <div class="node-content">
+                                <div class="node-title">2. Web & Benchmark Verifier</div>
+                                <div class="node-sub">Cross-Checks SOTA & Docs</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector3"></div>
+
+                        <!-- Node 4: Senior Master Writer -->
+                        <div class="pipeline-node node-idle" id="nodeWriter">
+                            <div class="node-icon">✍️</div>
+                            <div class="node-content">
+                                <div class="node-title">3. Master Writer</div>
+                                <div class="node-sub">Drafts Technical Deep Dive</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector4"></div>
+
+                        <!-- Node 5: Visual & Architecture Diagrammer -->
+                        <div class="pipeline-node node-idle" id="nodeDiagrammer">
+                            <div class="node-icon">📊</div>
+                            <div class="node-content">
+                                <div class="node-title">4. Visual Architect</div>
+                                <div class="node-sub">Mermaid.js Flowcharts & Graph</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector5"></div>
+
+                        <!-- Node 6: Code QA Inspector -->
+                        <div class="pipeline-node node-idle" id="nodeCodeQa">
+                            <div class="node-icon">💻</div>
+                            <div class="node-content">
+                                <div class="node-title">5. Code QA Inspector</div>
+                                <div class="node-sub">Validates Imports & Syntax</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector6"></div>
+
+                        <!-- Node 7: Editor-in-Chief -->
+                        <div class="pipeline-node node-idle" id="nodeEditor">
+                            <div class="node-icon">🛡️</div>
+                            <div class="node-content">
+                                <div class="node-title">6. Editor-in-Chief</div>
+                                <div class="node-sub">Fact-Checks & Weaves Post</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector7"></div>
+
+                        <!-- Node 8: SEO & Social Growth -->
+                        <div class="pipeline-node node-idle" id="nodeSeo">
+                            <div class="node-icon">📈</div>
+                            <div class="node-content">
+                                <div class="node-title">7. SEO Strategist</div>
+                                <div class="node-sub">SEO Tags, LinkedIn & X Thread</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector8"></div>
+
+                        <!-- Node 9: Podcast Audio Producer -->
+                        <div class="pipeline-node node-idle" id="nodePodcast">
+                            <div class="node-icon">🎙️</div>
+                            <div class="node-content">
+                                <div class="node-title">8. Podcast Producer</div>
+                                <div class="node-sub">2-Host Conversational Script</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector9"></div>
+
+                        <!-- Node 10: Substack Newsletter Strategist -->
+                        <div class="pipeline-node node-idle" id="nodeNewsletter">
+                            <div class="node-icon">📧</div>
+                            <div class="node-content">
+                                <div class="node-title">9. Newsletter Specialist</div>
+                                <div class="node-sub">A/B Subject Lines & Edition</div>
+                            </div>
+                            <div class="node-status-badge">Idle</div>
+                        </div>
+
+                        <div class="flow-connector" id="connector10"></div>
+
+                        <!-- Node 11: Master Output Package -->
+                        <div class="pipeline-node node-idle" id="nodeOutput">
+                            <div class="node-icon">📦</div>
+                            <div class="node-content">
+                                <div class="node-title">Master Delivery Kit</div>
+                                <div class="node-sub">Article, Cover, Social, Audio, Email</div>
+                            </div>
+                            <div class="node-status-badge">Package</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Tabs for Outputs, Studio, Dialogue, Training, & Terminal -->
+            <section class="display-panel">
+                <div class="tabs-header">
+                    <div class="tabs-scroll-wrapper">
+                        <button class="tab-btn active" data-tab="articleTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <span>Master Article</span>
+                        </button>
+                        <button class="tab-btn" data-tab="coverTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <span>Cover Art</span>
+                            <span class="badge-pill" id="coverBadge">HD</span>
+                        </button>
+                        <button class="tab-btn" data-tab="socialTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                            <span>SEO & Social Kit</span>
+                        </button>
+                        <button class="tab-btn" data-tab="podcastTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                            <span>🎙️ Podcast Studio</span>
+                        </button>
+                        <button class="tab-btn" data-tab="newsletterTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            <span>📧 Newsletter</span>
+                        </button>
+                        <button class="tab-btn" data-tab="ytSearchTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <span>🌐 YouTube Explorer</span>
+                        </button>
+                        <button class="tab-btn" data-tab="dialogueTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            <span>💬 Agent Dialogue</span>
+                        </button>
+                        <button class="tab-btn" data-tab="trainingTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            <span>🏋️ Training Lab</span>
+                        </button>
+                        <button class="tab-btn" data-tab="consoleTab">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                            <span>Terminal</span>
+                            <span class="live-dot-mini" id="terminalLiveBadge"></span>
+                        </button>
+                    </div>
+
+                    <!-- Export Actions Menu -->
+                    <div class="tab-actions">
+                        <button class="action-btn" id="copyMarkdownBtn" title="Copy Raw Markdown">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            <span>Copy MD</span>
+                        </button>
+                        <button class="action-btn" id="downloadMdBtn" title="Download .md File">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                            <span>.md</span>
+                        </button>
+                        <button class="action-btn" id="downloadHtmlBtn" title="Download Styled Standalone HTML">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                            <span>.html</span>
+                        </button>
+                        <button class="action-btn" id="printPdfBtn" title="Print or Save as PDF">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            <span>PDF</span>
+                        </button>
+                        <button class="action-btn btn-highlight" id="openWebhookBtn" title="Publish via Webhook (Zapier, Dev.to, Ghost, n8n)">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+                            <span>Publish</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Blog Article Preview -->
+                <div class="tab-content active" id="articleTab">
+                    <!-- Featured Cover Hero in Article -->
+                    <div class="article-cover-banner" id="articleCoverContainer" style="display: none;">
+                        <img id="articleCoverImg" src="" alt="AI Featured Cover Banner">
+                    </div>
+
+                    <div class="article-meta-bar" id="articleMetaBar" style="display: none;">
+                        <div class="meta-item">
+                            <span class="meta-label">Topic:</span>
+                            <span class="meta-val" id="metaTopic">AI vs ML vs Data Science</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Est. Read Time:</span>
+                            <span class="meta-val" id="metaReadTime">4 min read</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Word Count:</span>
+                            <span class="meta-val" id="metaWordCount">1,240 words</span>
+                        </div>
+                        <button type="button" class="btn-voice-preview" id="narrateArticleBtn" title="Narrate Article using Text-to-Speech">
+                            <span>🔊 Listen to Article</span>
+                        </button>
+                    </div>
+
+                    <div class="markdown-preview" id="markdownOutput">
+                        <div class="empty-state">
+                            <div class="empty-icon">📝</div>
+                            <h3>No Article Generated Yet</h3>
+                            <p>Enter your topic on the left and click <strong>"Launch 9-Agent Master Crew"</strong> to start transcription, deep research, Mermaid diagrams, code testing, and full multi-channel synthesis.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: AI Cover Studio -->
+                <div class="tab-content" id="coverTab">
+                    <div class="cover-studio-container">
+                        <div class="cover-controls-bar">
+                            <div class="style-selector-group">
+                                <span class="style-label">🎨 Aesthetic Style:</span>
+                                <div class="style-chips" id="coverStyleChips">
+                                    <button type="button" class="style-chip active" data-style="3d_tech">3D Glassmorphic</button>
+                                    <button type="button" class="style-chip" data-style="cyberpunk">Cyberpunk Neon</button>
+                                    <button type="button" class="style-chip" data-style="emerald">Quantum Emerald</button>
+                                    <button type="button" class="style-chip" data-style="sunset">Amber Velocity</button>
+                                </div>
+                            </div>
+                            <div class="cover-actions-group">
+                                <button type="button" class="btn btn-secondary btn-sm" id="regenCoverBtn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                                    <span>Regenerate Banner</span>
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" id="downloadCoverBtn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>Download HD (16:9)</span>
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="copyCoverMdBtn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    <span>Copy Markdown Tag</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="cover-preview-card" id="coverPreviewCard">
+                            <img id="studioCoverImg" src="/static/latest_cover.jpg" alt="Generated Cover Artwork">
+                            <div class="cover-meta-footer">
+                                <span class="cover-dim-badge">1200 × 630 HD (Social & Blog Standard)</span>
+                                <span class="cover-topic-label" id="coverTopicLabel">AI vs ML vs Data Science</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: SEO & Social Media Kit -->
+                <div class="tab-content" id="socialTab">
+                    <div class="social-kit-container" id="socialKitContainer">
+                        <div class="empty-state">
+                            <div class="empty-icon">📱</div>
+                            <h3>SEO & Social Media Kit Pending</h3>
+                            <p>Once the SEO Specialist finishes execution, your viral LinkedIn post, Twitter/X thread, and SEO tags will appear here with 1-click copy.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: Podcast Studio & Audio Player -->
+                <div class="tab-content" id="podcastTab">
+                    <!-- Integrated Web Audio Player Bar -->
+                    <div class="podcast-player-card" id="podcastPlayerCard">
+                        <div class="player-left">
+                            <div class="podcast-avatar">🎙️</div>
+                            <div class="podcast-meta">
+                                <div class="podcast-title" id="podcastPlayerTitle">Alex & Sam AI Deep Dive</div>
+                                <div class="podcast-sub">Autonomous Conversational Podcast • Web Speech Engine</div>
+                            </div>
+                        </div>
+
+                        <!-- Animated Waveform Bars -->
+                        <div class="audio-waveform" id="audioWaveform">
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                            <span class="wave-bar"></span>
+                        </div>
+
+                        <div class="player-controls">
+                            <div class="audio-speed-control">
+                                <span class="voice-label">Speed:</span>
+                                <select id="audioSpeedSelector">
+                                    <option value="0.85">0.85x</option>
+                                    <option value="1.0" selected>1.0x (Normal)</option>
+                                    <option value="1.2">1.2x (Fast)</option>
+                                    <option value="1.4">1.4x (Ultra)</option>
+                                </select>
+                            </div>
+                            <div class="audio-voice-select">
+                                <span class="voice-label">Host Voice:</span>
+                                <select id="audioVoiceSelector">
+                                    <option value="0">Natural Voice</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm btn-play-audio" id="playPodcastAudioBtn">
+                                <span id="playIcon">▶</span>
+                                <span id="playText">Play Voice Audio</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="stopPodcastAudioBtn" style="display: none;">
+                                <span>⏹ Stop</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="social-kit-container" id="podcastContainer">
+                        <div class="empty-state">
+                            <div class="empty-icon">🎙️</div>
+                            <h3>Conversational Podcast Script Pending</h3>
+                            <p>Once the Audio Producer finishes, a 2-host conversational dialogue and 60s executive voiceover script will appear here ready for playback and export.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 5: Newsletter Edition -->
+                <div class="tab-content" id="newsletterTab">
+                    <div class="social-kit-container" id="newsletterContainer">
+                        <div class="empty-state">
+                            <div class="empty-icon">📧</div>
+                            <h3>Substack / Beehiiv Newsletter Pending</h3>
+                            <p>Once the Newsletter Specialist finishes, a publication-ready email edition with A/B subject lines and reader polls will appear here.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 6: YouTube Knowledge Base Explorer -->
+                <div class="tab-content" id="ytSearchTab">
+                    <div class="yt-search-container">
+                        <div class="yt-search-header">
+                            <div class="yt-search-info">
+                                <h3>🌐 Universal YouTube Knowledge Base Explorer</h3>
+                                <p>Query top videos across the YouTube database, extract multilingual spoken transcripts, and preview raw knowledge before pipeline ingestion.</p>
+                            </div>
+                            <div class="yt-search-bar">
+                                <input type="text" id="ytExplorerInput" placeholder="Search topic across YouTube (e.g. DeepSeek R1 architecture, LoRA fine tuning)..." value="DeepSeek R1 architecture">
+                                <button type="button" class="btn btn-primary btn-sm" id="ytExplorerSearchBtn">
+                                    <span>🔍 Search Database</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="yt-search-results-grid" id="ytSearchResultsGrid">
+                            <div class="empty-state">
+                                <div class="empty-icon">🔎</div>
+                                <h3>Search the Universal YouTube Knowledge Base</h3>
+                                <p>Type a topic or creator keyword above and click "Search Database" to fetch multi-video transcripts and summaries instantly.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 7: Agent Co-Working Dialogue Stream -->
+                <div class="tab-content" id="dialogueTab">
+                    <div class="dialogue-container">
+                        <div class="dialogue-header">
+                            <div class="dialogue-info">
+                                <h3>💬 Inter-Agent Co-Working Dialogue</h3>
+                                <p>Real-time collaborative inquiry stream as agents delegate subtasks, ask peer questions, and verify deliverables.</p>
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" id="clearDialogueBtn">Clear Stream</button>
+                        </div>
+                        <div class="dialogue-stream" id="dialogueStream">
+                            <div class="dialogue-msg system">
+                                <div class="dialogue-avatar">⚡</div>
+                                <div class="dialogue-bubble">
+                                    <div class="dialogue-meta">
+                                        <span class="dialogue-agent">Master Coordinator</span>
+                                        <span class="dialogue-time">Ready</span>
+                                    </div>
+                                    <div class="dialogue-text">Inter-agent delegation protocols active. All 9 agents are connected with mutual co-worker inquiry channels.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 8: Training & Fine-Tuning Lab -->
+                <div class="tab-content" id="trainingTab">
+                    <div class="training-lab-container">
+                        <div class="training-header">
+                            <div class="training-title-box">
+                                <h3>🏋️ CrewAI Agent Training & Benchmark Lab</h3>
+                                <p>Execute iterative reinforcement training (`crew.train()`) with CrewAI Task Evaluators to calibrate prompt weights and performance scores.</p>
+                            </div>
+                            <div class="training-status-pill" id="trainingLabStatus">
+                                <span class="training-dot"></span>
+                                <span id="trainingLabStatusText">Ready for Training</span>
+                            </div>
+                        </div>
+
+                        <div class="training-grid">
+                            <!-- Training Config Card -->
+                            <div class="training-card">
+                                <h4>⚙️ Training Run Configuration</h4>
+                                <form id="trainingForm">
+                                    <div class="form-group">
+                                        <label for="trainIterationsInput">Number of Training Iterations</label>
+                                        <input type="number" id="trainIterationsInput" min="1" max="10" value="2" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="trainWeightsFilename">Trained Weights File (.pkl)</label>
+                                        <input type="text" id="trainWeightsFilename" value="trained_agents.pkl" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="trainTopicInput">Calibration Topic</label>
+                                        <input type="text" id="trainTopicInput" value="AI vs ML vs Data Science" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="trainChannelInput">Creator Channel</label>
+                                        <input type="text" id="trainChannelInput" value="@krishnaik06">
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary btn-block" id="startTrainingBtn">
+                                        <span>⚡ Start Crew Training Run</span>
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Training Diagnostics Dashboard -->
+                            <div class="training-card">
+                                <h4>📊 Evaluator Benchmark & Scoring</h4>
+                                <div class="training-metrics-list">
+                                    <div class="metric-row">
+                                        <span class="metric-label">Target Pipeline:</span>
+                                        <span class="metric-value">9 Specialized Collaborative Agents</span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Evaluator Strategy:</span>
+                                        <span class="metric-value">CrewAI Multi-Task Cross-Scoring</span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Active Weights:</span>
+                                        <span class="metric-value code" id="activeWeightsFile">trained_agents.pkl</span>
+                                    </div>
+                                    <div class="metric-row">
+                                        <span class="metric-label">Training Engine:</span>
+                                        <span class="metric-value">Google AI Studio Evaluator</span>
+                                    </div>
+                                </div>
+
+                                <div class="training-progress-box" id="trainingProgressBox" style="display: none;">
+                                    <div class="progress-bar-track">
+                                        <div class="progress-bar-fill" id="trainingProgressBar"></div>
+                                    </div>
+                                    <div class="progress-label" id="trainingProgressLabel">Iterating 1 of 2...</div>
+                                </div>
+
+                                <div class="training-feedback-log" id="trainingFeedbackLog">
+                                    <div class="feedback-placeholder">
+                                        Click <strong>"Start Crew Training Run"</strong> to execute iterative feedback loops and calibrate agent tasks.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 9: Terminal Logs -->
+                <div class="tab-content" id="consoleTab">
+                    <div class="terminal-container">
+                        <div class="terminal-header">
+                            <div class="terminal-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <span class="terminal-title">crewai@master-cluster:~$ python crew.py</span>
+                            <button class="terminal-clear-btn" id="clearLogsBtn">Clear</button>
+                        </div>
+                        <pre class="terminal-body" id="terminalLogs"><span class="log-info">[SYSTEM] CrewAI 9-Agent Master Engine Initialized. Ready for kickoff...</span></pre>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Webhook Publish Modal -->
+    <div class="modal-overlay" id="webhookModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>🚀 Multi-Platform Webhook Dispatcher</h3>
+                <button class="close-btn" id="closeWebhookBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">Send the master article, SEO growth kit, podcast dialogue, and newsletter directly to Zapier, Make, n8n, Slack, Dev.to, or custom CMS.</p>
+                <div class="form-group">
+                    <label for="webhookUrlInput">Target Webhook URL <span class="req">*</span></label>
+                    <input type="url" id="webhookUrlInput" placeholder="https://hooks.zapier.com/hooks/catch/... or https://n8n.example.com/webhook/..." required>
+                </div>
+                <div class="info-callout">
+                    <strong>Payload Delivery:</strong> Dispatches <code>topic</code>, <code>channel</code>, <code>article_markdown</code>, <code>social_snippets</code>, <code>podcast_script</code>, and <code>newsletter</code> in a single payload.
+                </div>
+                <div class="webhook-status" id="webhookStatus"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelWebhookBtn">Cancel</button>
+                <button class="btn btn-primary" id="sendWebhookBtn">Dispatch Webhook</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>⚙️ Engine & API Configuration</h3>
+                <button class="close-btn" id="closeSettingsBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="modalApiKey">Google AI Studio / Gemini API Key</label>
+                    <input type="password" id="modalApiKey" placeholder="AQ.xxxxxxxx or AIzaxxxxxxxx">
+                </div>
+
+                <div class="form-group">
+                    <label for="modalModelSelect">Active Model</label>
+                    <select id="modalModelSelect">
+                        <option value="gemini/gemini-3.8-flash">gemini/gemini-3.8-flash (Recommended - State of the Art Speed & Intelligence)</option>
+                        <option value="gemini/gemini-3.7-flash">gemini/gemini-3.7-flash (Hybrid Reasoning & High Context)</option>
+                        <option value="gemini/gemini-2.5-pro">gemini/gemini-2.5-pro (In-depth Complex Reasoning)</option>
+                        <option value="gemini/gemini-flash-latest">gemini/gemini-flash-latest (Google AI Studio Latest)</option>
+                        <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (Cost-Efficient / Fast)</option>
+                        <option value="openai/gpt-4o">openai/gpt-4o (State-of-the-Art Flagship)</option>
+                    </select>
+                </div>
+
+                <hr class="modal-divider">
+
+                <div class="settings-section-title">
+                    <span>🧠 Contextual Memory Engine</span>
+                </div>
+
+                <div class="form-group memory-toggle-group">
+                    <label class="toggle-label" for="modalMemoryToggle">
+                        <span class="toggle-text">Enable Multi-Tier Agent Memory</span>
+                        <span class="toggle-sub">Short-term context, cross-session long-term memory & entity recall</span>
+                    </label>
+                    <label class="switch">
+                        <input type="checkbox" id="modalMemoryToggle" checked>
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+
+                <div class="form-group" id="embedderGroup">
+                    <label for="modalEmbedderSelect">Vector Embeddings Provider</label>
+                    <select id="modalEmbedderSelect">
+                        <option value="onnx">Local ONNX MiniLM (Fast, Free, 0 API Quota Required)</option>
+                        <option value="google">Google AI Embeddings (models/text-embedding-004)</option>
+                        <option value="openai">OpenAI Direct Embeddings (text-embedding-3-small)</option>
+                    </select>
+                </div>
+
+                <div class="memory-management-box">
+                    <div class="memory-meta-info">
+                        <span class="mini-label">Storage Backend:</span>
+                        <span class="mini-val">LanceDB Persistent Vector Store</span>
+                    </div>
+                    <button type="button" class="btn btn-danger-outline btn-sm" id="resetMemoryBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                        <span>Reset Agent Memory Cache</span>
+                    </button>
+                    <div class="memory-reset-status" id="memoryResetStatus"></div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSettingsBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveSettingsBtn">Save Engine Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>
