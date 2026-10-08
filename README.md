@@ -248,7 +248,13 @@ crewai-content-engine/
 │
 ├── .github/workflows/
 │   ├── ci.yml                # Python test/quality workflow
-│   └── security.yml          # Dependency security scanning
+│   ├── security.yml          # Dependency security scanning
+│   ├── docker.yml            # Container build + health smoke test
+│   └── run-ai-evaluation.yml # Manual AI evaluation benchmark
+├── Dockerfile                # Production API container
+├── docker-compose.yml        # API + worker local deployment
+├── .dockerignore
+
 │
 ├── requirements.txt
 ├── .env.example
@@ -327,6 +333,28 @@ WORKER_ID=worker-1
 > Never commit `.env` or real API credentials.
 
 ---
+
+## 🐳 Run with Docker
+
+Build and start the API container:
+
+```bash
+docker build -t crewai-content-engine .
+docker run --env-file .env -p 8000:8000 -v "$(pwd)/artifacts:/app/artifacts" crewai-content-engine
+```
+
+For the API + worker setup, use:
+
+```bash
+docker compose up --build
+```
+
+The API exposes two operational probes:
+
+- `GET /health` — liveness probe for the HTTP process.
+- `GET /ready` — readiness probe that verifies the persistent job store is reachable.
+
+The Docker workflow builds the image and performs a real HTTP health smoke test on every pull request.
 
 ## ▶️ Run the system
 
