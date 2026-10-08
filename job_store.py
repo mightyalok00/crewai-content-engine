@@ -105,7 +105,7 @@ def _update(job_id: str, expected_lease_token: str | None = None, **changes: Any
                "heartbeat_at", "retry_count", "max_retries", "worker_id", "lease_token"}
     fields = {k: v for k, v in changes.items() if k in allowed}
     if "artifacts" in fields:
-        fields["artifacts"] = json.dumps(fields["artifacts"])
+        fields["artifacts_json"] = json.dumps(fields.pop("artifacts"))
     fields["updated_at"] = _now()
     assignments = ", ".join(f"{k} = ?" for k in fields)
     where = "job_id = ?" + (" AND lease_token = ?" if expected_lease_token else "")
