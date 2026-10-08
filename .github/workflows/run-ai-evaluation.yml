@@ -1,0 +1,52 @@
+name: Run AI Evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      minimum_score:
+        description: "Minimum score required to pass"
+        required: false
+        default: "0.80"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    name: Evaluate generated content
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run evaluation benchmark
+        run: >
+          python -m evaluation.run_evaluation
+          evaluation/fixtures/sample_article.md
+          --verification evaluation/fixtures/sample_verification.json
+          --minimum-score "${{ inputs.minimum_score }}"
+
+      - name: Upload evaluation report
+        if: always()
+        run: |
+          python -m evaluation.run_evaluation             evaluation/fixtures/sample_article.md             --verification evaluation/fixtures/sample_verification.json             --minimum-score "${{ inputs.minimum_score }}"             --output evaluation-report.json
+
+      - name: Publish evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-evaluation-report
+          path: evaluation-report.json
+          if-no-files-found: error
