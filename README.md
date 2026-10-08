@@ -459,6 +459,65 @@ Heartbeats, recovery, leases, and attempt isolation protect the job lifecycle.
 ### 5. Production-minded observability
 Persisted job events make progress replayable and easier to inspect.
 
+
+---
+
+## 🧪 AI Evaluation & Evidence Quality
+
+The engine now includes a deterministic evaluation layer that scores generated content before it is treated as a quality-gated artifact.
+
+### Evaluation dimensions
+
+| Dimension | What it checks |
+|---|---|
+| **Evidence coverage** | Verified claims, source presence, and evidence confidence |
+| **Verification** | Verification score, warnings, and unsupported claims |
+| **Structure** | H1, section structure, and minimum content organization |
+| **Code quality** | Code-fence language coverage and non-empty snippets |
+
+The evaluator produces a machine-readable report:
+
+```json
+{
+  "overall": 0.93,
+  "passed": true,
+  "scores": {
+    "evidence_coverage": 0.965,
+    "verification": 0.95,
+    "structure": 1.0,
+    "code_quality": 1.0
+  },
+  "notes": []
+}
+```
+
+Run it against a generated article:
+
+```bash
+python -m evaluation.run_evaluation \
+  artifacts/<job-id>/attempt-<retry>-<lease>/new_blog_post.md \
+  --verification verification.json \
+  --output evaluation.json
+```
+
+The same evaluator is integrated into `quality_gate.py`, so content quality is now based on both the existing publication heuristics and evidence-aware evaluation.
+
+### Why this matters
+
+Traditional unit tests can prove that the software works. They cannot prove that an AI-generated article is trustworthy.
+
+This evaluation layer creates a repeatable quality signal that can be expanded with:
+
+- LLM-as-a-judge evaluators
+- Human preference datasets
+- Factuality benchmarks
+- Citation precision/recall
+- Model and prompt regression tracking
+- Cost/quality comparisons across providers
+
+The CI pipeline runs a deterministic evaluation benchmark on every supported Python version.
+
+
 ---
 
 ## 🗺️ Roadmap

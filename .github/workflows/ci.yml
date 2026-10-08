@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, expert-production-upgrade]
+    branches: [main, expert-production-upgrade, feat/ai-evaluation-evidence-pipeline]
   pull_request:
     branches: [main]
 jobs:
@@ -20,3 +20,5 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m compileall -q .
       - run: pytest -q
+      - name: AI content evaluation benchmark
+        run: python -m evaluation.run_evaluation evaluation/fixtures/sample_article.md --verification evaluation/fixtures/sample_verification.json --minimum-score 0.80

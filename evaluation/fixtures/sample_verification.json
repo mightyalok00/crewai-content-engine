@@ -1,0 +1,13 @@
+{
+  "verified_claims": [
+    {
+      "claim": "Evidence should be recorded for important claims.",
+      "source": "official documentation",
+      "confidence": 0.95,
+      "notes": ""
+    }
+  ],
+  "warnings": [],
+  "unsupported_claims": [],
+  "score": 0.95
+}
