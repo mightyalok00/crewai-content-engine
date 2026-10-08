@@ -48,7 +48,9 @@ def evaluate_quality(
 
     evaluation = evaluate_package(text, verification, minimum_score=minimum_score)
     overall = round(0.70 * legacy_overall + 0.30 * evaluation.overall, 3)
-    blockers.extend(note for note in evaluation.notes if note not in blockers)
+    for note in ("unsupported_claims_present", "verification_report_missing"):
+        if note in evaluation.notes and note not in blockers:
+            blockers.append(note)
 
     return ContentQualityReport(
         factuality=round(factuality, 3),
