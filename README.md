@@ -166,3 +166,90 @@ Generation now supports request-scoped jobs instead of forcing clients to keep a
 The legacy `POST /api/generate` endpoint remains available and now returns the same `job_id` contract, allowing the existing frontend to migrate incrementally.
 
 Generated artifacts are copied into `artifacts/{job_id}/` so separate requests do not intentionally share the same output namespace.
+
+
+## 🧵 Persistent Worker Architecture
+
+Generation is now decoupled from the FastAPI process.
+
+### Production flow
+
+~~~text
+Client
+  │
+  ▼
+FastAPI ──► SQLite Job Store
+                 │
+                 ▼
+          Persistent Job Queue
+                 │
+          ┌──────┴──────┐
+          ▼             ▼
+      Worker 1       Worker 2
+          │             │
+          └──────┬──────┘
+                 ▼
+             CrewAI 9-Agent
+                 │
+                 ▼
+          artifacts/{job_id}/
+~~~
+
+### Worker behavior
+
+Run the API and worker separately:
+
+~~~bash
+python app.py
+python worker.py
+~~~
+
+Each worker executes one CrewAI job at a time. To increase throughput, run additional worker processes with unique `WORKER_ID` values. SQLite atomically claims queued jobs so two workers cannot claim the same job.
+
+The job store provides:
+- **Persistent state** in SQLite instead of process memory.
+- **Replayable SSE events** stored in the database.
+- **Bounded retries** with configurable `max_retries`.
+- **Heartbeat-based crash recovery** for abandoned running jobs.
+- **Request-scoped artifact directories** so generated files belong to one job.
+- **Atomic job claiming** across multiple worker processes.
+- **One CrewAI execution per worker process** to avoid shared CrewAI task state collisions.
+
+### Example
+
+~~~text
+POST /api/jobs
+      ↓
+job_id = abc123
+      ↓
+status = queued
+      ↓
+worker claims job
+      ↓
+status = running
+      ↓
+9 agents execute
+      ↓
+quality/artifacts saved
+      ↓
+status = completed
+~~~
+
+If an execution fails, the worker retries until `max_retries` is exhausted. If a worker crashes, another worker can recover the stale job after the configured heartbeat timeout.
+
+### Scaling
+
+For a local machine:
+
+~~~bash
+python worker.py
+~~~
+
+For higher throughput, run multiple worker processes:
+
+~~~bash
+WORKER_ID=worker-1 python worker.py
+WORKER_ID=worker-2 python worker.py
+~~~
+
+For larger multi-machine deployments, the SQLite job-store interface can later be replaced by PostgreSQL/Redis without changing the public job API.

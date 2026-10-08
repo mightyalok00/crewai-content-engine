@@ -47,6 +47,7 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 class GenerateRequest(BaseModel):
     topic: str = Field(..., min_length=1, max_length=500)
     channel: str = Field("@krishnaik06", max_length=500)
+    max_retries: int = Field(2, ge=0, le=5)
 
 
 class YouTubeInspectRequest(BaseModel):
@@ -465,9 +466,9 @@ async def generate_blog(req: GenerateRequest):
 
     New clients should use POST /api/jobs and poll /api/jobs/{job_id}.
     """
-    from jobs import create_job, get_job
+    from jobs import create_job
 
-    job = create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06")
+    job = create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06", req.max_retries)
     return {
         "job_id": job["job_id"],
         "status": job["status"],
@@ -479,7 +480,7 @@ async def generate_blog(req: GenerateRequest):
 @app.post("/api/jobs")
 async def create_generation_job(req: GenerateRequest):
     from jobs import create_job
-    return create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06")
+    return create_job(req.topic.strip(), req.channel.strip() or "@krishnaik06", req.max_retries)
 
 
 @app.get("/api/jobs/{job_id}")

@@ -67,6 +67,16 @@ def get_embedder_config() -> dict:
         return {"provider": "onnx"}
 
 
+def configure_output_directory(output_dir: str | os.PathLike[str]) -> None:
+    """Route CrewAI file-producing tasks to an isolated job directory."""
+    output_path = os.fspath(output_dir)
+    os.makedirs(output_path, exist_ok=True)
+    review_and_edit_task.output_file = os.path.join(output_path, "new_blog_post.md")
+    seo_social_task.output_file = os.path.join(output_path, "social_snippets.md")
+    podcast_script_task.output_file = os.path.join(output_path, "podcast_script.md")
+    newsletter_task.output_file = os.path.join(output_path, "newsletter.md")
+
+
 def create_blog_crew(memory_enabled: bool | None = None) -> Crew:
     """Instantiate the 9-Agent Master Studio Crew with full contextual memory support."""
     load_dotenv(override=True)
