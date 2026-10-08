@@ -131,3 +131,27 @@ Or pass custom topic and channel arguments:
 ```bash
 python crew.py "LangChain vs CrewAI" "@freecodecamp"
 ```
+
+
+## 🛡️ Production Engineering Upgrade
+
+The project now includes a production-hardening layer while keeping the existing Studio UI and 9-agent workflow intact.
+
+### Security
+- API keys are never returned by GET /api/settings; the response exposes only api_key_configured.
+- Admin/settings/export/webhook operations are localhost-restricted by default.
+- Remote admin access requires APP_API_TOKEN and a Bearer token.
+- CORS defaults to localhost origins instead of wildcard access.
+- Webhook URLs are validated against private, loopback, link-local, multicast, and reserved addresses.
+- Webhook redirects are disabled to reduce SSRF risk.
+- Request models enforce size and enum constraints with Pydantic.
+
+### Quality Engineering
+- models.py provides typed contracts for research, evidence, verification, quality reports, and artifacts.
+- quality_gate.py provides a deterministic post-generation quality score and blockers for future regeneration loops.
+- tests/ covers the security boundary, Pydantic validation, and quality-gate behavior.
+- .github/workflows/ci.yml runs syntax checks and tests on Python 3.11 and 3.12.
+- .github/workflows/security.yml runs scheduled pip-audit dependency checks.
+
+### Local configuration
+Copy .env.example to .env. For a local-only installation, leave APP_API_TOKEN empty. If the application is exposed through a reverse proxy or network interface, set a strong token and restrict the proxy/firewall as well.
