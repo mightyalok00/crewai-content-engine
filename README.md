@@ -165,7 +165,7 @@ Generation now supports request-scoped jobs instead of forcing clients to keep a
 
 The legacy `POST /api/generate` endpoint remains available and now returns the same `job_id` contract, allowing the existing frontend to migrate incrementally.
 
-Generated artifacts are copied into `artifacts/{job_id}/` so separate requests do not intentionally share the same output namespace.
+Generated artifacts are stored under `artifacts/{job_id}/attempt-{retry}-{lease}/`. Each worker execution attempt gets its own directory, preventing a stale worker from overwriting a replacement worker's files.
 
 
 ## 🧵 Persistent Worker Architecture
@@ -192,7 +192,7 @@ FastAPI ──► SQLite Job Store
              CrewAI 9-Agent
                  │
                  ▼
-          artifacts/{job_id}/
+      artifacts/{job_id}/attempt-*/
 ~~~
 
 ### Worker behavior
@@ -214,6 +214,8 @@ The job store provides:
 - **Request-scoped artifact directories** so generated files belong to one job.
 - **Atomic job claiming** across multiple worker processes.
 - **One CrewAI execution per worker process** to avoid shared CrewAI task state collisions.
+- **Fenced worker leases** so stale workers cannot complete or fail a job after recovery.
+- **Per-attempt artifact isolation** so stale executions cannot overwrite replacement outputs.
 
 ### Example
 
