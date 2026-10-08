@@ -19,7 +19,7 @@ def test_job_lifecycle_is_persistent(monkeypatch, tmp_path):
     assert created["status"] == "queued"
     assert get_job(created["job_id"])["topic"] == "Test topic"
 
-    claimed = claim_next_job()
+    claimed = claim_next_job("test-worker")
     assert claimed["job_id"] == created["job_id"]
     assert get_job(created["job_id"])["status"] == "running"
 
@@ -61,3 +61,30 @@ def test_update_job_persists_artifacts(monkeypatch, tmp_path):
     job = job_store.create_job("Artifacts", "@test")
     updated = update_job(job["job_id"], artifacts={"article": "artifacts/x/article.md"})
     assert updated["artifacts"]["article"].endswith("article.md")
+
+
+def test_stale_worker_cannot_complete_after_recovery(monkeypatch, tmp_path):
+    import job_store
+
+    monkeypatch.setattr(job_store, "DB_PATH", tmp_path / "lease.sqlite3")
+    job_store.init_db()
+    job = job_store.create_job("Lease test", "@test", max_retries=1)
+    claimed = job_store.claim_next_job("worker-a")
+    old_lease = claimed["lease_token"]
+
+    assert job_store.recover_stale_jobs(0) == 1
+    recovered = job_store.get_job(job["job_id"])
+    assert recovered["status"] == "queued"
+    assert recovered["lease_token"] is None
+
+    replacement = job_store.claim_next_job("worker-b")
+    assert replacement["lease_token"] != old_lease
+
+    try:
+        job_store.complete_job(job["job_id"], old_lease, {"article": "stale.md"})
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("stale worker was allowed to complete a recovered job")
+
+    assert job_store.get_job(job["job_id"])["status"] == "running"
