@@ -1,6 +1,8 @@
 name: Docker
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -8,9 +10,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
-    name: Build container
+    name: Build and smoke test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,12 +27,18 @@ jobs:
 
       - name: Smoke test
         run: |
+          set -euo pipefail
           docker run --detach --name crewai-api -p 8000:8000 crewai-content-engine:test
           trap 'docker logs crewai-api || true; docker rm -f crewai-api || true' EXIT
+
           for i in {1..30}; do
             if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              echo "Container health check passed."
               exit 0
             fi
             sleep 2
           done
+
+          echo "Container failed health check."
+          docker logs crewai-api
           exit 1
