@@ -7,11 +7,13 @@ import urllib.request
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+from security import require_local_admin, safe_webhook_url, post_json, Field
 
 from security import require_local_admin, safe_webhook_url, post_json
 
@@ -50,7 +52,7 @@ class GenerateRequest(BaseModel):
 
 
 class YouTubeInspectRequest(BaseModel):
-    url: str = Field(..., min_length=1, max_length=2048)
+    url: str = Field(..., min_length=1, max_length=2048) = Field(..., min_length=1, max_length=2048)
 
 
 class SettingsRequest(BaseModel):
@@ -61,7 +63,7 @@ class SettingsRequest(BaseModel):
 
 
 class WebhookPublishRequest(BaseModel):
-    webhook_url: str = Field(..., min_length=8, max_length=2048)
+    webhook_url: str = Field(..., min_length=8, max_length=2048) = Field(..., min_length=8, max_length=2048)
     topic: str
     channel: str = ""
     markdown_content: str
@@ -357,7 +359,8 @@ async def publish_webhook(req: WebhookPublishRequest, request: Request):
 
 
 @app.post("/api/export-html")
-async def export_html(req: HtmlExportRequest):
+async def export_html(req: HtmlExportRequest, request: Request):
+    require_local_admin(request)
     # The exported body is intentionally treated as HTML. This endpoint is local-only in the
     # production profile; callers should sanitize untrusted content before publishing it.
     styled_html = f"""<!DOCTYPE html>
