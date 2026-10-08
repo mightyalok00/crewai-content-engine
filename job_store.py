@@ -190,15 +190,36 @@ def recover_stale_jobs(timeout_seconds: int = 300) -> int:
             (cutoff_iso,),
         ).fetchall()
         for row in rows:
+            job = conn.execute(
+                "SELECT retry_count, max_retries FROM jobs WHERE job_id = ?",
+                (row["job_id"],),
+            ).fetchone()
+            next_retry = int(job["retry_count"]) + 1
+            if next_retry <= int(job["max_retries"]):
+                status = "queued"
+                finished_at = None
+            else:
+                status = "failed"
+                finished_at = _now()
             conn.execute(
                 """UPDATE jobs
-                   SET status='queued', retry_count=retry_count + 1,
-                       error='Recovered after worker heartbeat timeout',
-                       updated_at=?
+                   SET status=?, retry_count=?, error=?,
+                       finished_at=?, updated_at=?
                    WHERE job_id=? AND status='running'""",
-                (_now(), row["job_id"]),
+                (
+                    status,
+                    next_retry,
+                    "Recovered after worker heartbeat timeout",
+                    finished_at,
+                    _now(),
+                    row["job_id"],
+                ),
             )
-            append_event(row["job_id"], "status", {"status": "queued", "reason": "worker_recovery"})
+            append_event(
+                row["job_id"],
+                "status",
+                {"status": status, "reason": "worker_recovery", "retry_count": next_retry},
+            )
     return len(rows)
 
 
