@@ -392,6 +392,24 @@ For larger deployments, the job-store interface can evolve toward a PostgreSQL/R
 
 ---
 
+## ▶️ GitHub Actions run buttons
+
+You can run the automated checks directly from GitHub.
+
+### CI
+
+[![CI](https://github.com/mightyalok00/crewai-content-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mightyalok00/crewai-content-engine/actions/workflows/ci.yml)
+
+The **CI** workflow runs automatically on pull requests and pushes to `main`, and can also be started manually from the **Actions** tab.
+
+### AI Evaluation
+
+[![Run AI Evaluation](https://img.shields.io/badge/Actions-Run%20AI%20Evaluation-2088FF?logo=githubactions&logoColor=white)](https://github.com/mightyalok00/crewai-content-engine/actions/workflows/run-ai-evaluation.yml)
+
+Open **Actions → Run AI Evaluation → Run workflow** to execute the evaluation benchmark manually. You can set the minimum score threshold before starting the run.
+
+The workflow also uploads the resulting `evaluation-report.json` as a downloadable GitHub Actions artifact.
+
 ## 🧪 Testing
 
 Run the full test suite:
