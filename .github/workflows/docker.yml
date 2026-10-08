@@ -1,0 +1,32 @@
+name: Docker
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build --tag crewai-content-engine:test .
+
+      - name: Smoke test
+        run: |
+          docker run --detach --name crewai-api -p 8000:8000 crewai-content-engine:test
+          trap 'docker logs crewai-api || true; docker rm -f crewai-api || true' EXIT
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
