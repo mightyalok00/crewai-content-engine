@@ -30,6 +30,7 @@ class ContentQualityReport(BaseModel):
     overall: float = Field(ge=0.0, le=1.0)
     passed: bool
     blockers: list[str] = Field(default_factory=list)
+    evaluation: "ContentEvaluationReport | None" = None
 
 class ContentEvaluationReport(BaseModel):
     overall: float = Field(ge=0.0, le=1.0)
