@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from security import require_local_admin, safe_webhook_url, post_json
+from observability import build_job_metrics, request_id
 
 # Configure UTF-8 encoding on Windows
 if sys.platform == "win32":
@@ -22,7 +23,16 @@ if sys.platform == "win32":
 
 load_dotenv(override=True)
 
-app = FastAPI(title="CrewAI Studio API", version="3.6.0")
+app = FastAPI(title="CrewAI Studio API", version="3.7.0")
+
+@app.middleware("http")
+async def correlation_middleware(request: Request, call_next):
+    """Attach a correlation ID to every response without exposing secrets."""
+    correlation_id = request.headers.get("X-Request-ID") or request_id()
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = correlation_id
+    return response
+
 
 
 @app.get("/health")
@@ -528,4 +538,26 @@ async def get_generation_artifacts(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return {"job_id": job_id, "artifacts": job.get("artifacts", {})}
+
+
+@app.get("/api/jobs/{job_id}/timeline")
+async def get_generation_timeline(job_id: str):
+    """Return replayable lifecycle events for observability and debugging."""
+    from jobs import get_events, get_job
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"job_id": job_id, "events": get_events(job_id)}
+
+
+@app.get("/api/jobs/{job_id}/metrics")
+async def get_generation_metrics(job_id: str):
+    """Return operational metrics derived from persisted job state and events."""
+    from jobs import get_events, get_job
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return build_job_metrics(job, get_events(job_id))
 
