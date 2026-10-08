@@ -39,6 +39,5 @@ embeddings_cache/
 # Runtime job artifacts and generated outputs
 artifacts/
 
-# Generated cover images (keep only the tracked latest preview)
+# Generated cover images
 static/covers/*.jpg
-!static/covers/.gitkeep
