@@ -31,6 +31,12 @@ class ContentQualityReport(BaseModel):
     passed: bool
     blockers: list[str] = Field(default_factory=list)
 
+class ContentEvaluationReport(BaseModel):
+    overall: float = Field(ge=0.0, le=1.0)
+    passed: bool
+    scores: dict[str, float] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+
 class ArtifactManifest(BaseModel):
     job_id: str
     topic: str
