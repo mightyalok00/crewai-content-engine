@@ -38,12 +38,16 @@ jobs:
           --verification evaluation/fixtures/sample_verification.json
           --minimum-score "${{ inputs.minimum_score }}"
 
-      - name: Upload evaluation report
+      - name: Generate evaluation report
         if: always()
         run: |
-          python -m evaluation.run_evaluation             evaluation/fixtures/sample_article.md             --verification evaluation/fixtures/sample_verification.json             --minimum-score "${{ inputs.minimum_score }}"             --output evaluation-report.json
+          python -m evaluation.run_evaluation \
+            evaluation/fixtures/sample_article.md \
+            --verification evaluation/fixtures/sample_verification.json \
+            --minimum-score "${{ inputs.minimum_score }}" \
+            --output evaluation-report.json
 
-      - name: Publish evaluation report
+      - name: Upload evaluation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
